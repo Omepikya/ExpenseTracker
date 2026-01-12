@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expense Tracker Dashboard</title>
+
+    <!-- CDN Links -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/manifest+json,{
+      \"name\": \"Expense Tracker\",
+      \"short_name\": \"ExpTrk\",
+      \"start_url\": \".\",
+      \"display\": \"standalone\",
+      \"background_color\": \"#f8f9fa\",
+      \"theme_color\": \"#0d6efd\",
+      \"icons\": [{
+        \"src\": \"data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiIGZpbGw9IiMwZDZlZmQiLz48L3N2Zz4K\",
+        \"sizes\": \"192x192\",
+        \"type\": \"image/svg+xml\"
+      }]
+    }">
+    <meta name="theme-color" content="#0d6efd">
+
+    <style>
+        /* ====== CORE STYLES ====== */
+        :root {
+          --bg: #f8f9fa;
+          --fg: #212529;
+          --p: #0d6efd;
+          --s: #198754;
+          --d: #212529;
+          --radius: .35rem;
+          --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
+        * {
+          box-sizing: border-box;
+          font-family: var(--font);
+        }
+
+        body {
+          margin: 0;
+          background: var(--bg);
+          color: var(--fg);
+          transition: .3s;
+        }
+
+        .dark-mode {
+          --bg: #212529;
+          --fg: #f8f9fa;
+        }
+
+        .dark-mode .table {
+          color: #f8f9fa;
+          background: #212529;
+        }
+
+        .dark-mode .modal-content {
+          background: #343a40;
+          color: #f8f9fa;
+        }
+
+        .dark-mode .form-control,
+        .dark-mode .form-select {
+          background: #495057;
+          color: #f8f9fa;
+          border-color: #6c757d;
+        }
+
+        .dark-mode .dropdown-menu {
+          background: #343a40;
+          border-color: #495057;
+        }
+
+        .dark-mode .dropdown-item {
+          color: #f8f9fa;
+        }
+
+        .dark-mode .dropdown-item:hover {
+          background: #495057;
+        }
+
+        .dark-mode .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke='rgba(255, 255, 255, 0.75)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg>");
+        }
+
+        .container {
+          max-width: 1200px;
+          margin: 30px auto;
+        }
+
+        /* ====== COMPONENT STYLES ====== */
+        .stats-card {
+          height: 100%;
+          transition: transform 0.2s;
+        }
+        
+        .stats-card:hover {
+          transform: translateY(-5px);
+        }
+        
+        .progress {
+          height: 20px;
+        }
+        
+        .expense-table th,
+        .expense-table td {
+          vertical-align: middle;
+        }
+        
+        .chart-container {
+          position: relative;
+          height: 400px;
+          margin-top: 30px;
+        }
+        
+        @media (max-width: 768px) {
+          .btn-responsive {
+            width: 100%;
+            margin-bottom: 5px;
+          }
+          .chart-container {
+            height: 300px;
+          }
+        }
+
+        /* ====== LOADING STATES ====== */
+        .loading {
+          opacity: 0.7;
+          pointer-events: none;
+        }
+        
+        .spinner-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+
+        /* ====== FEATURE STYLES ====== */
+        .confidence-badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-left: 5px;
+        }
+        .confidence-confirmed { background: #198754; color: white; }
+        .confidence-estimated { background: #ffc107; color: #212529; }
+        .confidence-auto { background: #6c757d; color: white; }
+        
+        .split-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        .dark-mode .split-section {
+            background: #343a40;
+        }
+        
+        .health-score {
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .health-score-excellent { color: #198754; }
+        .health-score-good { color: #0d6efd; }
+        .health-score-fair { color: #ffc107; }
+        .health-score-poor { color: #dc3545; }
+        
+        .insights-container {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-left: 4px solid #0d6efd;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .dark-mode .insights-container {
+            background: linear-gradient(135deg, #343a40, #212529);
+            border-left-color: #198754;
+        }
+
+        /* ====== FLOATING ACTION BUTTON ====== */
+        #quickBtn {
+          position: fixed;
+          bottom: 1rem;
+          right: 1rem;
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: var(--p);
+          color: #fff;
+          font-size: 1.5rem;
+          display: grid;
+          place-items: center;
+          border: none;
+          box-shadow: 0 2px 6px rgba(0,0,0,.25);
+          transition: transform 0.2s ease;
+          z-index: 1000;
+        }
+
+        #quickBtn:hover {
+          transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- ====== NAVBAR ====== -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold"><i class="bi bi-currency-dollar"></i> Expense Tracker</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMenu" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarMenu">
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown me-2 mb-2">
+                        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-tools"></i> Tools
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" data-bs-toggle="modal" data-bs-target="#calcModal"><i class="bi bi-calculator"></i> Calculator</a></li>
+                            <li><a class="dropdown-item" data-bs-toggle="modal" data-bs-target="#currencyConverterModal"><i class="bi bi-currency-exchange"></i> Currency Converter</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <button id="darkModeBtn" class="btn btn-secondary me-2 mb-2">
+                            <i class="bi bi-moon-fill"></i> Dark Mode
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-info mb-2 me-2" data-bs-toggle="modal" data-bs-target="#helpModal">
+                            <i class="bi bi-question-circle"></i> Help
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-danger mb-2" onclick="logout()">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ====== MAIN CONTAINER ====== -->
+    <div class="container">
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="spinner-overlay" style="display: none;">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- ====== INSIGHTS SECTION ====== -->
+        <div id="insightsContainer" class="insights-container" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Smart Insights</h6>
+                <button class="btn btn-sm btn-outline-primary" onclick="showAllInsights()">View All</button>
+            </div>
+            <div id="insightItems" class="mt-2"></div>
+        </div>
+
+        <!-- ====== STATS ROW ====== -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-primary stats-card">
+                    <div class="card-body">
+                        <h5>Budget</h5>
+                        <h3 id="budgetDisplay">₹0.00</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-success stats-card">
+                    <div class="card-body">
+                        <h5>Remaining</h5>
+                        <h3 id="remainingBalanceDisplay">₹0.00</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-info stats-card">
+                    <div class="card-body">
+                        <h5>Total Spent</h5>
+                        <h3 id="totalSpentDisplay">₹0.00</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-warning stats-card">
+                    <div class="card-body">
+                        <h5>Health Score</h5>
+                        <h3 id="healthScoreDisplay" class="health-score">0</h3>
+                        <small id="healthScoreLabel">Calculating...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== BUDGET PROGRESS ====== -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Budget Progress</h5>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Spent: <span id="budgetSpent">₹0.00</span></span>
+                    <span>Remaining: <span id="budgetRemaining">₹0.00</span></span>
+                </div>
+                <div class="progress">
+                    <div id="budgetProgressBar" class="progress-bar bg-success" style="width:0%"></div>
+                </div>
+                <div class="mt-1 text-end">
+                    <small id="budgetPercentage">0% used</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== ACTION BUTTONS ====== -->
+        <div class="d-flex flex-wrap mb-4">
+            <button class="btn btn-success me-2 mb-2" data-bs-toggle="modal" data-bs-target="#budgetModal">
+                <i class="bi bi-calculator"></i> Set Budget
+            </button>
+            <button class="btn btn-primary me-2 mb-2" data-bs-toggle="modal" data-bs-target="#expenseModal">
+                <i class="bi bi-plus-circle"></i> Add Expense
+            </button>
+            <button class="btn btn-info me-2 mb-2" data-bs-toggle="modal" data-bs-target="#recurringExpenseModal">
+                <i class="bi bi-arrow-repeat"></i> Add Recurring
+            </button>
+            <button class="btn btn-warning me-2 mb-2" data-bs-toggle="modal" data-bs-target="#savingsGoalModal">
+                <i class="bi bi-piggy-bank"></i> Add Goal
+            </button>
+            <div class="dropdown me-2 mb-2">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" onclick="exportData('json')">JSON</a></li>
+                    <li><a class="dropdown-item" onclick="exportData('csv')">CSV</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-outline-info mb-2" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+
+        <!-- ====== EXPENSE TABLE ====== -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Confidence</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseList">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading expenses...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <nav id="paginationNav" class="pagination justify-content-center mt-3"></nav>
+            </div>
+        </div>
+
+        <!-- ====== SAVINGS GOALS ====== -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Savings Goals</h5>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#savingsGoalModal">
+                        <i class="bi bi-plus"></i> Add Goal
+                    </button>
+                </div>
+                <div id="savingsGoalsContainer">
+                    <div class="alert alert-info">No savings goals yet. Add your first goal!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== RECURRING EXPENSES ====== -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Recurring Expenses</h5>
+                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#recurringExpenseModal">
+                        <i class="bi bi-plus"></i> Add Recurring
+                    </button>
+                </div>
+                <div id="recurringExpensesContainer">
+                    <div class="alert alert-info">No recurring expenses yet.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== CHARTS SECTION ====== -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Expense Analytics</h5>
+                <ul class="nav nav-tabs" id="chartTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pie-chart">By Category</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#bar-chart">Monthly</button>
+                    </li>
+                </ul>
+                <div class="tab-content p-3 border border-top-0">
+                    <div class="tab-pane fade show active" id="pie-chart">
+                        <div class="chart-container">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="bar-chart">
+                        <div class="chart-container">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== MODALS ====== -->
+    
+    <!-- Budget Modal -->
+    <div class="modal fade" id="budgetModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Set Monthly Budget</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Budget Amount (₹)</label>
+                        <input type="number" id="budgetAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Month</label>
+                        <select id="budgetMonth" class="form-select">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <input type="number" id="budgetYear" class="form-control" value="2024" min="2020" max="2030">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveBudget()">Save Budget</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div class="modal fade" id="expenseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Expense</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="expenseDescription" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select id="expenseCategory" class="form-select" required>
+                            <option value="">Select Category</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Health">Health</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" id="expenseAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="expenseDate" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confidence Level</label>
+                        <select id="expenseConfidence" class="form-select">
+                            <option value="confirmed">Confirmed</option>
+                            <option value="estimated" selected>Estimated</option>
+                            <option value="auto">Auto-generated</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea id="expenseNote" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveExpense()">Save Expense</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Expense Modal -->
+    <div class="modal fade" id="editExpenseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Expense</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editExpenseId">
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="editExpenseDescription" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select id="editExpenseCategory" class="form-select" required>
+                            <option value="">Select Category</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Health">Health</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" id="editExpenseAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="editExpenseDate" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confidence Level</label>
+                        <select id="editExpenseConfidence" class="form-select">
+                            <option value="confirmed">Confirmed</option>
+                            <option value="estimated">Estimated</option>
+                            <option value="auto">Auto-generated</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea id="editExpenseNote" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateExpense()">Update Expense</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Savings Goal Modal -->
+    <div class="modal fade" id="savingsGoalModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Savings Goal</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Goal Title</label>
+                        <input type="text" id="goalTitle" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target Amount (₹)</label>
+                        <input type="number" id="goalTargetAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Amount (₹)</label>
+                        <input type="number" id="goalCurrentAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea id="goalNotes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSavingsGoal()">Save Goal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recurring Expense Modal -->
+    <div class="modal fade" id="recurringExpenseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Recurring Expense</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="recurringDescription" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select id="recurringCategory" class="form-select" required>
+                            <option value="">Select Category</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Health">Health</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" id="recurringAmount" class="form-control" min="0" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Interval</label>
+                        <select id="recurringInterval" class="form-select" required>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Next Payment Date</label>
+                        <input type="date" id="recurringNextRun" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveRecurringExpense()">Save Recurring</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-question-circle"></i> Help & Information</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-shield-check"></i> 
+                        <strong>Your data is secure!</strong> All expenses, budgets, and goals are stored in Supabase with end-to-end encryption.
+                    </div>
+                    
+                    <h6>Getting Started</h6>
+                    <p>Welcome to Expense Tracker! Here's how to begin:</p>
+                    <ol>
+                        <li><strong>Set a budget</strong> - Click "Set Budget" to define your monthly spending limit</li>
+                        <li><strong>Add expenses</strong> - Record your daily expenses using "Add Expense"</li>
+                        <li><strong>Track goals</strong> - Use savings goals to track progress towards financial targets</li>
+                        <li><strong>Set recurring expenses</strong> - Automatically track regular bills and subscriptions</li>
+                    </ol>
+                    
+                    <h6>Confidence Levels</h6>
+                    <ul>
+                        <li><span class="confidence-badge confidence-confirmed">Confirmed</span> - Exact amount known</li>
+                        <li><span class="confidence-badge confidence-estimated">Estimated</span> - Approximate amount</li>
+                        <li><span class="confidence-badge confidence-auto">Auto-generated</span> - Generated by recurring expenses</li>
+                    </ul>
+                    
+                    <h6>Data Security</h6>
+                    <p>All your data is stored securely in Supabase with:</p>
+                    <ul>
+                        <li>Row Level Security (RLS) - Only you can see your data</li>
+                        <li>Encrypted connections</li>
+                        <li>Automatic backups</li>
+                        <li>GDPR compliance</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculator Modal -->
+    <div class="modal fade" id="calcModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calculator"></i> Calculator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="calcDisplay" class="form-control mb-2" value="0" readonly>
+                    <div class="row g-1 mb-1">
+                        <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcClear()">C</button></div>
+                        <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcBack()">⌫</button></div>
+                        <div class="col-3"><button class="btn btn-warning w-100" onclick="calcOp('/')">/</button></div>
+                        <div class="col-3"><button class="btn btn-warning w-100" onclick="calcOp('*')">×</button></div>
+                    </div>
+                    <div class="row g-1 mb-1">
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('7')">7</button></div>
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('8')">8</button></div>
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('9')">9</button></div>
+                        <div class="col-3"><button class="btn btn-warning w-100" onclick="calcOp('-')">-</button></div>
+                    </div>
+                    <div class="row g-1 mb-1">
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('4')">4</button></div>
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('5')">5</button></div>
+                        <div class="col-3"><button class="btn btn-light w-100" onclick="calcDigit('6')">6</button></div>
+                        <div class="col-3"><button class="btn btn-warning w-100" onclick="calcOp('+')">+</button></div>
+                    </div>
+                    <div class="row g-1">
+                        <div class="col-9">
+                            <div class="row g-1">
+                                <div class="col-4"><button class="btn btn-light w-100" onclick="calcDigit('1')">1</button></div>
+                                <div class="col-4"><button class="btn btn-light w-100" onclick="calcDigit('2')">2</button></div>
+                                <div class="col-4"><button class="btn btn-light w-100" onclick="calcDigit('3')">3</button></div>
+                                <div class="col-4"><button class="btn btn-light w-100" onclick="calcDigit('0')">0</button></div>
+                                <div class="col-4"><button class="btn btn-light w-100" onclick="calcDigit('.')">.</button></div>
+                            </div>
+                        </div>
+                        <div class="col-3"><button class="btn btn-success w-100 h-100" onclick="calcEquals()">=</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Currency Converter Modal -->
+    <div class="modal fade" id="currencyConverterModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-currency-exchange"></i> Currency Converter</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount</label>
+                        <input type="number" id="converterAmount" class="form-control" value="1" step="0.01">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5">
+                            <label class="form-label">From</label>
+                            <select id="converterFrom" class="form-select">
+                                <option value="INR" selected>INR (₹)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                            </select>
+                        </div>
+                        <div class="col-2 d-flex align-items-end justify-content-center">
+                            <button class="btn btn-outline-secondary" onclick="swapCurrencies()">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label">To</label>
+                            <select id="converterTo" class="form-select">
+                                <option value="USD">USD ($)</option>
+                                <option value="INR">INR (₹)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 mb-3" onclick="convertCurrency()">Convert</button>
+                    <div class="alert alert-success" id="converterResult">
+                        1 INR = 0.012 USD
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== FLOATING ACTION BUTTON ====== -->
+    <button id="quickBtn" title="Quick Add Expense" data-bs-toggle="modal" data-bs-target="#expenseModal">
+        <i class="bi bi-plus"></i>
+    </button>
+
+    <!-- ====== SCRIPTS ====== -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    
+    <script>
+        // ====== SUPABASE INITIALIZATION ======
+        const SUPABASE_URL = 'https://vhqlftjfdmsafkrwxwkj.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_esFa4vqeqr4Sqnk0R6fs0g_LRyhULef';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // ====== GLOBAL STATE ======
+        let userId = null;
+        let expenses = [];
+        let budgets = [];
+        let savingsGoals = [];
+        let recurringExpenses = [];
+        let currency = 'INR';
+        let currencySymbol = '₹';
+        let darkMode = false;
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        
+        // ====== DOM HELPER ======
+        const $ = id => document.getElementById(id);
+        
+        // ====== AUTHENTICATION ======
+        async function checkAuth() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) throw error;
+                
+                if (!session) {
+                    window.location.href = 'auth.html';
+                    return false;
+                }
+                
+                userId = session.user.id;
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = 'auth.html';
+                return false;
+            }
+        }
+        
+        function logout() {
+            supabase.auth.signOut()
+                .then(() => {
+                    window.location.href = 'auth.html';
+                })
+                .catch(error => {
+                    console.error('Logout error:', error);
+                    showToast('Error logging out', 'error');
+                });
+        }
+        
+        // ====== LOADING STATES ======
+        function showLoading() {
+            $('loadingOverlay').style.display = 'flex';
+        }
+        
+        function hideLoading() {
+            $('loadingOverlay').style.display = 'none';
+        }
+        
+        // ====== TOAST NOTIFICATIONS ======
+        function showToast(message, type = 'info') {
+            // Create toast element
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="bi ${type === 'success' ? 'bi-check-circle' : type === 'error' ? 'bi-exclamation-triangle' : 'bi-info-circle'} me-2"></i>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            // Add to container
+            const container = document.createElement('div');
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.appendChild(toastEl);
+            document.body.appendChild(container);
+            
+            // Show toast
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+            
+            // Remove after hidden
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                container.remove();
+            });
+        }
+        
+        // ====== DATA LOADING ======
+        async function loadAllData() {
+            showLoading();
+            
+            try {
+                // Load expenses
+                const { data: expensesData, error: expError } = await supabase
+                    .from('expenses')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                
+                if (expError) throw expError;
+                expenses = expensesData || [];
+                
+                // Load current month's budget
+                const now = new Date();
+                const month = now.getMonth() + 1;
+                const year = now.getFullYear();
+                
+                const { data: budgetData, error: budgetError } = await supabase
+                    .from('budgets')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('month', month)
+                    .eq('year', year)
+                    .single();
+                
+                if (!budgetError && budgetData) {
+                    budgets = [budgetData];
+                } else {
+                    budgets = [];
+                }
+                
+                // Load savings goals
+                const { data: goalsData, error: goalsError } = await supabase
+                    .from('savings_goals')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                
+                if (!goalsError && goalsData) {
+                    savingsGoals = goalsData || [];
+                }
+                
+                // Load recurring expenses
+                const { data: recurringData, error: recurringError } = await supabase
+                    .from('recurring_expenses')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('active', true)
+                    .order('next_run', { ascending: true });
+                
+                if (!recurringError && recurringData) {
+                    recurringExpenses = recurringData || [];
+                }
+                
+                // Load UI preferences
+                currency = localStorage.getItem('currency') || 'INR';
+                darkMode = localStorage.getItem('darkMode') === 'true';
+                
+                // Update UI
+                if (darkMode) {
+                    document.body.classList.add('dark-mode');
+                    updateDarkIcon();
+                }
+                
+                // Render everything
+                renderDashboard();
+                renderCharts();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast('Error loading data from server', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ====== DASHBOARD RENDERING ======
+        function renderDashboard() {
+            updateBudgetDisplay();
+            renderExpenses();
+            renderSavingsGoals();
+            renderRecurringExpenses();
+            calculateHealthScore();
+            generateInsights();
+        }
+        
+        function updateBudgetDisplay() {
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            
+            // Find current month's budget
+            const currentBudget = budgets.find(b => 
+                b.month === currentMonth && b.year === currentYear
+            );
+            
+            const budgetAmount = currentBudget ? parseFloat(currentBudget.amount) : 0;
+            
+            // Calculate total spent this month
+            const currentMonthExpenses = expenses.filter(exp => {
+                const expDate = new Date(exp.created_at);
+                return expDate.getMonth() + 1 === currentMonth && 
+                       expDate.getFullYear() === currentYear;
+            });
+            
+            const totalSpent = currentMonthExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+            const remaining = budgetAmount - totalSpent;
+            const percentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+            
+            // Update UI
+            $('budgetDisplay').textContent = formatCurrency(budgetAmount);
+            $('remainingBalanceDisplay').textContent = formatCurrency(remaining);
+            $('totalSpentDisplay').textContent = formatCurrency(totalSpent);
+            $('budgetSpent').textContent = formatCurrency(totalSpent);
+            $('budgetRemaining').textContent = formatCurrency(remaining);
+            $('budgetPercentage').textContent = percentage.toFixed(1) + '% used';
+            
+            // Update progress bar
+            const progressBar = $('budgetProgressBar');
+            progressBar.style.width = Math.min(percentage, 100) + '%';
+            
+            // Color coding
+            progressBar.className = 'progress-bar';
+            if (percentage < 70) {
+                progressBar.classList.add('bg-success');
+            } else if (percentage < 90) {
+                progressBar.classList.add('bg-warning');
+            } else {
+                progressBar.classList.add('bg-danger');
+            }
+        }
+        
+        function renderExpenses() {
+            const tbody = $('expenseList');
+            if (!tbody) return;
+            
+            if (expenses.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No expenses yet. Add your first expense!
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                $('paginationNav').innerHTML = '';
+                return;
+            }
+            
+            // Calculate pagination
+            const totalPages = Math.ceil(expenses.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const pageExpenses = expenses.slice(startIndex, startIndex + itemsPerPage);
+            
+            // Render expenses
+            tbody.innerHTML = pageExpenses.map(expense => `
+                <tr>
+                    <td>${expense.description}</td>
+                    <td>${expense.category || 'Other'}</td>
+                    <td>${formatCurrency(expense.amount)}</td>
+                    <td>${formatDate(expense.created_at)}</td>
+                    <td>
+                        <span class="confidence-badge confidence-${expense.confidence || 'estimated'}">
+                            ${expense.confidence || 'estimated'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary me-1" onclick="editExpense('${expense.id}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteExpense('${expense.id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Render pagination
+            renderPagination(totalPages);
+        }
+        
+        function renderPagination(totalPages) {
+            const nav = $('paginationNav');
+            if (!nav || totalPages <= 1) {
+                nav.innerHTML = '';
+                return;
+            }
+            
+            let html = '<ul class="pagination">';
+            
+            // Previous button
+            html += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">&laquo;</a>
+                </li>
+            `;
+            
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                html += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                    </li>
+                `;
+            }
+            
+            // Next button
+            html += `
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">&raquo;</a>
+                </li>
+            `;
+            
+            html += '</ul>';
+            nav.innerHTML = html;
+        }
+        
+        function changePage(page) {
+            if (page < 1 || page > Math.ceil(expenses.length / itemsPerPage)) return;
+            currentPage = page;
+            renderExpenses();
+        }
+        
+        function renderSavingsGoals() {
+            const container = $('savingsGoalsContainer');
+            if (!container) return;
+            
+            if (savingsGoals.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No savings goals yet. Set your first goal!
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="row">
+                    ${savingsGoals.map(goal => `
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">${goal.title}</h5>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Progress</span>
+                                        <span>${formatCurrency(goal.current_amount)} / ${formatCurrency(goal.target_amount)}</span>
+                                    </div>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar" 
+                                             style="width: ${(goal.current_amount / goal.target_amount) * 100}%">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between small text-muted">
+                                        <span>Remaining: ${formatCurrency(goal.target_amount - goal.current_amount)}</span>
+                                        <span>${goal.notes || ''}</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="updateGoalProgress('${goal.id}')">
+                                            Update
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSavingsGoal('${goal.id}')">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function renderRecurringExpenses() {
+            const container = $('recurringExpensesContainer');
+            if (!container) return;
+            
+            if (recurringExpenses.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No recurring expenses yet.
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="list-group">
+                    ${recurringExpenses.map(exp => `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">${exp.description}</h6>
+                                <small class="text-muted">
+                                    ${exp.category} • ${formatCurrency(exp.amount)} • ${exp.interval} • Next: ${formatDate(exp.next_run)}
+                                </small>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRecurringExpense('${exp.id}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // ====== EXPENSE CRUD ======
+        async function saveExpense() {
+            const description = $('expenseDescription').value.trim();
+            const category = $('expenseCategory').value;
+            const amount = parseFloat($('expenseAmount').value);
+            const date = $('expenseDate').value;
+            const confidence = $('expenseConfidence').value;
+            const note = $('expenseNote').value.trim();
+            
+            // Validation
+            if (!description || !category || isNaN(amount) || amount <= 0 || !date) {
+                showToast('Please fill all required fields', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { data, error } = await supabase
+                    .from('expenses')
+                    .insert({
+                        user_id: userId,
+                        description,
+                        category,
+                        amount,
+                        note,
+                        confidence,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                // Add to local state
+                expenses.unshift(data);
+                
+                // Reset form and close modal
+                $('expenseDescription').value = '';
+                $('expenseCategory').value = '';
+                $('expenseAmount').value = '';
+                $('expenseNote').value = '';
+                
+                const modal = bootstrap.Modal.getInstance($('expenseModal'));
+                modal.hide();
+                
+                // Update UI
+                renderDashboard();
+                renderCharts();
+                
+                showToast('Expense added successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error saving expense:', error);
+                showToast('Error saving expense', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function editExpense(expenseId) {
+            const expense = expenses.find(e => e.id === expenseId);
+            if (!expense) return;
+            
+            // Populate edit form
+            $('editExpenseId').value = expenseId;
+            $('editExpenseDescription').value = expense.description;
+            $('editExpenseCategory').value = expense.category || 'Other';
+            $('editExpenseAmount').value = expense.amount;
+            $('editExpenseDate').value = expense.created_at.split('T')[0];
+            $('editExpenseConfidence').value = expense.confidence || 'estimated';
+            $('editExpenseNote').value = expense.note || '';
+            
+            // Show modal
+            const modal = new bootstrap.Modal($('editExpenseModal'));
+            modal.show();
+        }
+        
+        async function updateExpense() {
+            const expenseId = $('editExpenseId').value;
+            const description = $('editExpenseDescription').value.trim();
+            const category = $('editExpenseCategory').value;
+            const amount = parseFloat($('editExpenseAmount').value);
+            const date = $('editExpenseDate').value;
+            const confidence = $('editExpenseConfidence').value;
+            const note = $('editExpenseNote').value.trim();
+            
+            // Validation
+            if (!expenseId || !description || !category || isNaN(amount) || amount <= 0 || !date) {
+                showToast('Please fill all required fields', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { error } = await supabase
+                    .from('expenses')
+                    .update({
+                        description,
+                        category,
+                        amount,
+                        note,
+                        confidence,
+                        created_at: date + 'T00:00:00.000Z'
+                    })
+                    .eq('id', expenseId)
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                // Update local state
+                const index = expenses.findIndex(e => e.id === expenseId);
+                if (index !== -1) {
+                    expenses[index] = {
+                        ...expenses[index],
+                        description,
+                        category,
+                        amount,
+                        note,
+                        confidence,
+                        created_at: date + 'T00:00:00.000Z'
+                    };
+                }
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance($('editExpenseModal'));
+                modal.hide();
+                
+                // Update UI
+                renderDashboard();
+                renderCharts();
+                
+                showToast('Expense updated successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error updating expense:', error);
+                showToast('Error updating expense', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function deleteExpense(expenseId) {
+            if (!confirm('Are you sure you want to delete this expense?')) return;
+            
+            showLoading();
+            
+            try {
+                const { error } = await supabase
+                    .from('expenses')
+                    .delete()
+                    .eq('id', expenseId)
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                // Remove from local state
+                expenses = expenses.filter(e => e.id !== expenseId);
+                
+                // Update UI
+                renderDashboard();
+                renderCharts();
+                
+                showToast('Expense deleted successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error deleting expense:', error);
+                showToast('Error deleting expense', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ====== BUDGET FUNCTIONS ======
+        async function saveBudget() {
+            const amount = parseFloat($('budgetAmount').value);
+            const month = parseInt($('budgetMonth').value);
+            const year = parseInt($('budgetYear').value);
+            
+            if (isNaN(amount) || amount <= 0) {
+                showToast('Please enter a valid budget amount', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                // Check if budget exists for this month/year
+                const { data: existingBudget } = await supabase
+                    .from('budgets')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('month', month)
+                    .eq('year', year)
+                    .single();
+                
+                let error;
+                
+                if (existingBudget) {
+                    // Update existing budget
+                    const { error: updateError } = await supabase
+                        .from('budgets')
+                        .update({ amount })
+                        .eq('id', existingBudget.id)
+                        .eq('user_id', userId);
+                    
+                    error = updateError;
+                } else {
+                    // Create new budget
+                    const { error: insertError } = await supabase
+                        .from('budgets')
+                        .insert({
+                            user_id: userId,
+                            amount,
+                            month,
+                            year,
+                            created_at: new Date().toISOString()
+                        });
+                    
+                    error = insertError;
+                }
+                
+                if (error) throw error;
+                
+                // Reload budgets
+                const now = new Date();
+                const currentMonth = now.getMonth() + 1;
+                const currentYear = now.getFullYear();
+                
+                const { data: budgetData, error: budgetError } = await supabase
+                    .from('budgets')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('month', currentMonth)
+                    .eq('year', currentYear)
+                    .single();
+                
+                if (!budgetError && budgetData) {
+                    budgets = [budgetData];
+                }
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance($('budgetModal'));
+                modal.hide();
+                
+                // Reset form
+                $('budgetAmount').value = '';
+                
+                // Update UI
+                renderDashboard();
+                
+                showToast('Budget saved successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error saving budget:', error);
+                showToast('Error saving budget', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ====== SAVINGS GOALS ======
+        async function saveSavingsGoal() {
+            const title = $('goalTitle').value.trim();
+            const targetAmount = parseFloat($('goalTargetAmount').value);
+            const currentAmount = parseFloat($('goalCurrentAmount').value);
+            const notes = $('goalNotes').value.trim();
+            
+            if (!title || isNaN(targetAmount) || targetAmount <= 0 || isNaN(currentAmount) || currentAmount < 0) {
+                showToast('Please fill all required fields', 'error');
+                return;
+            }
+            
+            if (currentAmount > targetAmount) {
+                showToast('Current amount cannot exceed target amount', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { data, error } = await supabase
+                    .from('savings_goals')
+                    .insert({
+                        user_id: userId,
+                        title,
+                        target_amount: targetAmount,
+                        current_amount: currentAmount,
+                        notes,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                // Add to local state
+                savingsGoals.unshift(data);
+                
+                // Reset form and close modal
+                $('goalTitle').value = '';
+                $('goalTargetAmount').value = '';
+                $('goalCurrentAmount').value = '';
+                $('goalNotes').value = '';
+                
+                const modal = bootstrap.Modal.getInstance($('savingsGoalModal'));
+                modal.hide();
+                
+                // Update UI
+                renderSavingsGoals();
+                
+                showToast('Savings goal added successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error saving savings goal:', error);
+                showToast('Error saving savings goal', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function updateGoalProgress(goalId) {
+            const goal = savingsGoals.find(g => g.id === goalId);
+            if (!goal) return;
+            
+            const newAmount = prompt(`Enter new current amount for "${goal.title}":`, goal.current_amount);
+            if (!newAmount || isNaN(parseFloat(newAmount))) return;
+            
+            const amount = parseFloat(newAmount);
+            if (amount > goal.target_amount) {
+                showToast('Current amount cannot exceed target amount', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { error } = await supabase
+                    .from('savings_goals')
+                    .update({ current_amount: amount })
+                    .eq('id', goalId)
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                // Update local state
+                const index = savingsGoals.findIndex(g => g.id === goalId);
+                if (index !== -1) {
+                    savingsGoals[index].current_amount = amount;
+                }
+                
+                // Update UI
+                renderSavingsGoals();
+                
+                showToast('Goal progress updated', 'success');
+                
+            } catch (error) {
+                console.error('Error updating goal:', error);
+                showToast('Error updating goal', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function deleteSavingsGoal(goalId) {
+            if (!confirm('Are you sure you want to delete this savings goal?')) return;
+            
+            showLoading();
+            
+            try {
+                const { error } = await supabase
+                    .from('savings_goals')
+                    .delete()
+                    .eq('id', goalId)
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                // Remove from local state
+                savingsGoals = savingsGoals.filter(g => g.id !== goalId);
+                
+                // Update UI
+                renderSavingsGoals();
+                
+                showToast('Savings goal deleted', 'success');
+                
+            } catch (error) {
+                console.error('Error deleting goal:', error);
+                showToast('Error deleting goal', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ====== RECURRING EXPENSES ======
+        async function saveRecurringExpense() {
+            const description = $('recurringDescription').value.trim();
+            const category = $('recurringCategory').value;
+            const amount = parseFloat($('recurringAmount').value);
+            const interval = $('recurringInterval').value;
+            const nextRun = $('recurringNextRun').value;
+            
+            if (!description || !category || isNaN(amount) || amount <= 0 || !nextRun) {
+                showToast('Please fill all required fields', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const { data, error } = await supabase
+                    .from('recurring_expenses')
+                    .insert({
+                        user_id: userId,
+                        description,
+                        category,
+                        amount,
+                        interval,
+                        next_run: nextRun,
+                        active: true,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                // Add to local state
+                recurringExpenses.push(data);
+                
+                // Reset form and close modal
+                $('recurringDescription').value = '';
+                $('recurringCategory').value = '';
+                $('recurringAmount').value = '';
+                $('recurringNextRun').value = '';
+                
+                const modal = bootstrap.Modal.getInstance($('recurringExpenseModal'));
+                modal.hide();
+                
+                // Update UI
+                renderRecurringExpenses();
+                
+                showToast('Recurring expense added successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error saving recurring expense:', error);
+                showToast('Error saving recurring expense', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        async function deleteRecurringExpense(expenseId) {
+            if (!confirm('Are you sure you want to delete this recurring expense?')) return;
+            
+            showLoading();
+            
+            try {
+                const { error } = await supabase
+                    .from('recurring_expenses')
+                    .delete()
+                    .eq('id', expenseId)
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                // Remove from local state
+                recurringExpenses = recurringExpenses.filter(e => e.id !== expenseId);
+                
+                // Update UI
+                renderRecurringExpenses();
+                
+                showToast('Recurring expense deleted', 'success');
+                
+            } catch (error) {
+                console.error('Error deleting recurring expense:', error);
+                showToast('Error deleting recurring expense', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // ====== FEATURES ======
+        function calculateHealthScore() {
+            if (expenses.length === 0) {
+                $('healthScoreDisplay').textContent = '0';
+                $('healthScoreLabel').textContent = 'No data';
+                return;
+            }
+            
+            // Simplified health score calculation
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            
+            // Current month's budget
+            const currentBudget = budgets.find(b => 
+                b.month === currentMonth && b.year === currentYear
+            );
+            const budgetAmount = currentBudget ? parseFloat(currentBudget.amount) : 0;
+            
+            // Current month expenses
+            const currentMonthExpenses = expenses.filter(exp => {
+                const expDate = new Date(exp.created_at);
+                return expDate.getMonth() + 1 === currentMonth && 
+                       expDate.getFullYear() === currentYear;
+            });
+            
+            const totalSpent = currentMonthExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+            
+            let score = 0;
+            
+            // Budget adherence (max 50 points)
+            if (budgetAmount > 0) {
+                const budgetUsage = (totalSpent / budgetAmount) * 100;
+                if (budgetUsage <= 80) score += 50;
+                else if (budgetUsage <= 100) score += 30;
+                else if (budgetUsage <= 120) score += 10;
+            } else {
+                score += 20; // Partial points for having a budget at all
+            }
+            
+            // Expense consistency (max 30 points)
+            const dailySpending = {};
+            currentMonthExpenses.forEach(exp => {
+                const date = exp.created_at.split('T')[0];
+                dailySpending[date] = (dailySpending[date] || 0) + parseFloat(exp.amount);
+            });
+            
+            const daysWithSpending = Object.keys(dailySpending).length;
+            const avgDaily = totalSpent / daysWithSpending || 0;
+            
+            let consistencyScore = 0;
+            if (daysWithSpending > 10) consistencyScore += 15;
+            if (avgDaily < (budgetAmount / 30)) consistencyScore += 15;
+            
+            score += consistencyScore;
+            
+            // Savings progress (max 20 points)
+            if (savingsGoals.length > 0) {
+                const totalProgress = savingsGoals.reduce((sum, g) => 
+                    sum + (g.current_amount / g.target_amount), 0) / savingsGoals.length;
+                score += Math.min(20, totalProgress * 20);
+            }
+            
+            // Cap at 100
+            score = Math.min(100, Math.round(score));
+            
+            // Update UI
+            $('healthScoreDisplay').textContent = score;
+            const scoreEl = $('healthScoreDisplay');
+            
+            // Remove existing classes
+            scoreEl.className = 'health-score';
+            
+            // Add appropriate class
+            if (score >= 80) {
+                scoreEl.classList.add('health-score-excellent');
+                $('healthScoreLabel').textContent = 'Excellent';
+            } else if (score >= 60) {
+                scoreEl.classList.add('health-score-good');
+                $('healthScoreLabel').textContent = 'Good';
+            } else if (score >= 40) {
+                scoreEl.classList.add('health-score-fair');
+                $('healthScoreLabel').textContent = 'Fair';
+            } else {
+                scoreEl.classList.add('health-score-poor');
+                $('healthScoreLabel').textContent = 'Needs Attention';
+            }
+        }
+        
+        function generateInsights() {
+            const insights = [];
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
+            
+            // Get current month's budget
+            const currentBudget = budgets.find(b => 
+                b.month === currentMonth && b.year === currentYear
+            );
+            const budgetAmount = currentBudget ? parseFloat(currentBudget.amount) : 0;
+            
+            // Get current month expenses
+            const currentMonthExpenses = expenses.filter(exp => {
+                const expDate = new Date(exp.created_at);
+                return expDate.getMonth() + 1 === currentMonth && 
+                       expDate.getFullYear() === currentYear;
+            });
+            
+            const totalSpent = currentMonthExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+            
+            // Budget insights
+            if (budgetAmount > 0) {
+                const remaining = budgetAmount - totalSpent;
+                const percentage = (totalSpent / budgetAmount) * 100;
+                
+                if (percentage > 90) {
+                    insights.push({
+                        type: 'danger',
+                        message: `You've used ${percentage.toFixed(1)}% of your budget this month`
+                    });
+                } else if (percentage > 70) {
+                    insights.push({
+                        type: 'warning',
+                        message: `You've used ${percentage.toFixed(1)}% of your budget`
+                    });
+                }
+                
+                if (remaining > 0) {
+                    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+                    const daysLeft = daysInMonth - now.getDate();
+                    const dailyBudget = remaining / Math.max(daysLeft, 1);
+                    
+                    insights.push({
+                        type: 'info',
+                        message: `You can spend ${formatCurrency(dailyBudget)} per day to stay within budget`
+                    });
+                }
+            }
+            
+            // Category insights
+            const categoryTotals = {};
+            currentMonthExpenses.forEach(exp => {
+                const category = exp.category || 'Other';
+                categoryTotals[category] = (categoryTotals[category] || 0) + parseFloat(exp.amount);
+            });
+            
+            Object.entries(categoryTotals).forEach(([category, amount]) => {
+                const percentage = (amount / totalSpent) * 100;
+                if (percentage > 40) {
+                    insights.push({
+                        type: 'warning',
+                        message: `${category} makes up ${percentage.toFixed(1)}% of your spending`
+                    });
+                }
+            });
+            
+            // Display insights
+            displayInsights(insights.slice(0, 3));
+        }
+        
+        function displayInsights(insights) {
+            const container = $('insightsContainer');
+            const itemsContainer = $('insightItems');
+            
+            if (!insights.length) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            itemsContainer.innerHTML = insights.map(insight => `
+                <div class="alert alert-${insight.type} mb-2 py-2">
+                    <i class="bi bi-${insight.type === 'danger' ? 'exclamation-triangle' : insight.type === 'warning' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                    ${insight.message}
+                </div>
+            `).join('');
+        }
+        
+        function showAllInsights() {
+            // For now, just show more details in console
+            console.log('All insights:', {
+                expenses,
+                budgets,
+                savingsGoals,
+                recurringExpenses
+            });
+            showToast('View console for detailed insights', 'info');
+        }
+        
+        // ====== CHARTS ======
+        function renderCharts() {
+            renderPieChart();
+            renderBarChart();
+        }
+        
+        function renderPieChart() {
+            const ctx = $('pieChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            // Destroy existing chart
+            if (window.pieChartInstance) {
+                window.pieChartInstance.destroy();
+            }
+            
+            // Group by category
+            const categoryTotals = {};
+            expenses.forEach(exp => {
+                const category = exp.category || 'Other';
+                categoryTotals[category] = (categoryTotals[category] || 0) + parseFloat(exp.amount);
+            });
+            
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+            
+            if (labels.length === 0) {
+                // Show empty state
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.fillStyle = '#6c757d';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No expense data', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                return;
+            }
+            
+            window.pieChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#C9CBCF', '#4D5360'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderBarChart() {
+            const ctx = $('barChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            // Destroy existing chart
+            if (window.barChartInstance) {
+                window.barChartInstance.destroy();
+            }
+            
+            // Group by month
+            const monthlyTotals = {};
+            expenses.forEach(exp => {
+                const date = new Date(exp.created_at);
+                const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                monthlyTotals[monthYear] = (monthlyTotals[monthYear] || 0) + parseFloat(exp.amount);
+            });
+            
+            // Get last 6 months
+            const months = [];
+            const now = new Date();
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                months.push({
+                    label: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                    value: monthlyTotals[monthYear] || 0
+                });
+            }
+            
+            const labels = months.map(m => m.label);
+            const data = months.map(m => m.value);
+            
+            window.barChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Monthly Spending',
+                        data: data,
+                        backgroundColor: '#36A2EB',
+                        borderColor: '#36A2EB',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Spent: ${formatCurrency(context.raw)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ====== UTILITY FUNCTIONS ======
+        function formatCurrency(amount) {
+            return currencySymbol + parseFloat(amount).toFixed(2);
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+        
+        function refreshData() {
+            loadAllData();
+            showToast('Data refreshed', 'success');
+        }
+        
+        function exportData(format) {
+            const data = {
+                expenses,
+                budgets,
+                savingsGoals,
+                recurringExpenses,
+                exportedAt: new Date().toISOString()
+            };
+            
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `expense-tracker-export-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } else if (format === 'csv') {
+                // Simple CSV export for expenses
+                const csvRows = [];
+                csvRows.push(['Description', 'Category', 'Amount', 'Date', 'Confidence', 'Notes'].join(','));
+                
+                expenses.forEach(exp => {
+                    csvRows.push([
+                        `"${exp.description.replace(/"/g, '""')}"`,
+                        `"${exp.category || ''}"`,
+                        exp.amount,
+                        exp.created_at,
+                        exp.confidence || '',
+                        `"${(exp.note || '').replace(/"/g, '""')}"`
+                    ].join(','));
+                });
+                
+                const csv = csvRows.join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            showToast(`Data exported as ${format.toUpperCase()}`, 'success');
+        }
+        
+        // ====== DARK MODE ======
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark-mode', darkMode);
+            localStorage.setItem('darkMode', darkMode);
+            updateDarkIcon();
+        }
+        
+        function updateDarkIcon() {
+            const icon = $('darkModeBtn').querySelector('i');
+            if (darkMode) {
+                icon.className = 'bi bi-sun-fill';
+                $('darkModeBtn').innerHTML = '<i class="bi bi-sun-fill"></i> Light Mode';
+            } else {
+                icon.className = 'bi bi-moon-fill';
+                $('darkModeBtn').innerHTML = '<i class="bi bi-moon-fill"></i> Dark Mode';
+            }
+        }
+        
+        // ====== CALCULATOR ======
+        let calcValue = '0';
+        let calcWaitingForOperand = false;
+        let calcOperator = null;
+        let calcPrevValue = 0;
+        
+        function calcDigit(digit) {
+            if (calcWaitingForOperand) {
+                calcValue = digit;
+                calcWaitingForOperand = false;
+            } else {
+                calcValue = calcValue === '0' ? digit : calcValue + digit;
+            }
+            $('calcDisplay').value = calcValue;
+        }
+        
+        function calcOp(op) {
+            const inputValue = parseFloat(calcValue);
+            
+            if (calcOperator && !calcWaitingForOperand) {
+                calcEquals();
+            }
+            
+            calcPrevValue = inputValue;
+            calcOperator = op;
+            calcWaitingForOperand = true;
+        }
+        
+        function calcEquals() {
+            const inputValue = parseFloat(calcValue);
+            
+            if (calcOperator) {
+                let result;
+                switch(calcOperator) {
+                    case '+':
+                        result = calcPrevValue + inputValue;
+                        break;
+                    case '-':
+                        result = calcPrevValue - inputValue;
+                        break;
+                    case '*':
+                        result = calcPrevValue * inputValue;
+                        break;
+                    case '/':
+                        result = calcPrevValue / inputValue;
+                        break;
+                    default:
+                        result = inputValue;
+                }
+                
+                calcValue = String(result);
+                $('calcDisplay').value = calcValue;
+                calcOperator = null;
+                calcWaitingForOperand = true;
+                calcPrevValue = result;
+            }
+        }
+        
+        function calcClear() {
+            calcValue = '0';
+            calcWaitingForOperand = false;
+            calcOperator = null;
+            calcPrevValue = 0;
+            $('calcDisplay').value = calcValue;
+        }
+        
+        function calcBack() {
+            if (calcValue.length > 1) {
+                calcValue = calcValue.slice(0, -1);
+            } else {
+                calcValue = '0';
+            }
+            $('calcDisplay').value = calcValue;
+        }
+        
+        // ====== CURRENCY CONVERTER ======
+        const exchangeRates = {
+            INR: 1,
+            USD: 0.012,
+            EUR: 0.011,
+            GBP: 0.0095
+        };
+        
+        function swapCurrencies() {
+            const from = $('converterFrom').value;
+            const to = $('converterTo').value;
+            
+            $('converterFrom').value = to;
+            $('converterTo').value = from;
+            
+            convertCurrency();
+        }
+        
+        function convertCurrency() {
+            const amount = parseFloat($('converterAmount').value) || 0;
+            const from = $('converterFrom').value;
+            const to = $('converterTo').value;
+            
+            if (from === to) {
+                $('converterResult').textContent = `${formatCurrency(amount)} = ${formatCurrency(amount)}`;
+                return;
+            }
+            
+            const rate = exchangeRates[to] / exchangeRates[from];
+            const converted = amount * rate;
+            
+            $('converterResult').innerHTML = `
+                <strong>${amount} ${from} = ${converted.toFixed(2)} ${to}</strong><br>
+                <small>1 ${from} = ${rate.toFixed(4)} ${to}</small>
+            `;
+        }
+        
+        // ====== INITIALIZATION ======
+        async function init() {
+            // Check authentication
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+            
+            // Set default dates
+            const today = new Date();
+            $('expenseDate').value = today.toISOString().split('T')[0];
+            $('recurringNextRun').value = today.toISOString().split('T')[0];
+            
+            // Set budget month/year to current
+            $('budgetMonth').value = today.getMonth() + 1;
+            $('budgetYear').value = today.getFullYear();
+            
+            // Set up dark mode button
+            $('darkModeBtn').addEventListener('click', toggleDarkMode);
+            
+            // Load initial data
+            await loadAllData();
+            
+            // Set up keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'k') {
+                    e.preventDefault();
+                    $('quickBtn').click();
+                }
+            });
+            
+            showToast('Welcome to Expense Tracker!', 'success');
+        }
+        
+        // Start the application
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+  </html>
